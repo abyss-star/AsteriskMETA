@@ -48,12 +48,25 @@ internal const val MihomoTunDevice = "asterisk0"
 internal const val MihomoTunInboundName = "asterisk-tun"
 internal const val MihomoTunRuntimeMarkerKey = "x-asteriskmeta-root-tun"
 
-// Fixed endpoint of the inbound that connects for the applications the policy
-// leaves out. The daemon hands their fake addresses over here, so both sides
-// have to agree on the same port without any configuration. One endpoint serves
-// both transports, because the core's transparent inbound takes connections and
-// datagrams on the same port.
+// Preferred endpoint of the inbound that connects for the applications the
+// policy leaves out. The daemon hands their fake addresses over here, so both
+// sides have to agree on the same port. One endpoint serves both transports,
+// because the core's transparent inbound takes connections and datagrams on the
+// same port.
 internal const val MihomoTproxyFakeIpRelayPort = 65534
+
+// The relay arrives on an inbound of its own, and a port carries one inbound:
+// the bridge modes keep their SOCKS inbound, which the tunnel helper dials, on
+// the preferred port, so there the relay moves to the next free one. Both the
+// profile and the daemon are told the same number.
+internal fun AppState.fakeIpRelayPort(): Int {
+    val taken = if (runMode == RunModeTproxy) {
+        listOfNotNull(transparentProxyPort.toPortOrNull(), localProxyPort.toPortOrNull())
+    } else {
+        listOfNotNull(socks5ProxyPort.toPortOrNull(), localProxyPort.toPortOrNull())
+    }
+    return (MihomoTproxyFakeIpRelayPort downTo 1).first { it !in taken }
+}
 
 internal object MihomoProfileFactory {
     fun buildProfileBytes(
@@ -447,7 +460,7 @@ private fun AppState.toMihomoFakeIpRelayListenerYamlMap(): Map<String, Any?> {
         "name" to MihomoTproxyFakeIpRelayInboundName,
         "type" to "tproxy",
         "listen" to "0.0.0.0",
-        "port" to MihomoTproxyFakeIpRelayPort,
+        "port" to fakeIpRelayPort(),
         "udp" to true,
         "proxy" to "DIRECT",
     )

@@ -94,6 +94,7 @@ private fun AsteriskdAppPolicy.toJsonObject(): JsonObject = buildJsonObject {
 private fun AsteriskdModeOptions.toJsonObject(): JsonObject = buildJsonObject {
     put("transparentPort", transparentPort?.let(::JsonPrimitive) ?: JsonNull)
     put("tunnelName", tunnelName?.let(::JsonPrimitive) ?: JsonNull)
+    put("fakeIpRelayPort", fakeIpRelayPort?.let(::JsonPrimitive) ?: JsonNull)
 }
 
 private fun AsteriskdMatcher.toJsonObject(): JsonObject = buildJsonObject {

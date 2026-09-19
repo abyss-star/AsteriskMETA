@@ -144,6 +144,7 @@ internal data class AsteriskdAppPolicy(
 internal data class AsteriskdModeOptions(
     val transparentPort: Int?,
     val tunnelName: String?,
+    val fakeIpRelayPort: Int?,
 )
 
 internal data class AsteriskdMatcher(
