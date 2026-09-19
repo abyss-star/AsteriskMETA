@@ -39,7 +39,11 @@ jobs:
       RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
       RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
       RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-      SEND_TO_TELEGRAM: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.send_to_telegram == 'true' }}
+      # Fork-only: upstream sends every push build to Telegram. A fork has no
+      # TELEGRAM_* secrets, and that final step would turn an otherwise
+      # successful build (APKs already signed and uploaded) red, so on this
+      # branch Telegram runs only for a manual dispatch that asks for it.
+      SEND_TO_TELEGRAM: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.send_to_telegram == 'true' }}
       REQUESTED_VERSION_NAME: ${{ github.event.inputs.version_name }}
 
     steps:
