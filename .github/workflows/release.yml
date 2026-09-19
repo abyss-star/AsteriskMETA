@@ -175,6 +175,15 @@ jobs:
             exit 1
           fi
 
+      # The version sync tasks below initialize the submodules they pin. Running
+      # that initialization here, once and in order, keeps several of them from
+      # writing .git/config at the same time, which fails with a lock error.
+      - name: Initialize submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule update --init --recursive
+
       - name: Build release APKs
         run: ./gradlew --no-daemon :app:assembleRelease
 
