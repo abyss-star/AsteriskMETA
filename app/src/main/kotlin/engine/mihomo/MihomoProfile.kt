@@ -44,14 +44,18 @@ import utils.toTrimmedNonEmptyDistinctList
 internal const val Bpf2SocksRuntimeMarkerKey = "x-asteriskmeta-root-bpf2socks"
 internal const val MihomoTproxyInboundName = "asterisk-tproxy"
 internal const val MihomoTproxyFakeIpRelayInboundName = "asterisk-fakeip-relay"
+internal const val MihomoTproxyFakeIpRelayDatagramInboundName = "asterisk-fakeip-relay-datagram"
 internal const val MihomoTunDevice = "asterisk0"
 internal const val MihomoTunInboundName = "asterisk-tun"
 internal const val MihomoTunRuntimeMarkerKey = "x-asteriskmeta-root-tun"
 
-// Fixed endpoint of the inbound that connects for the applications the policy
+// Fixed endpoints of the inbounds that connect for the applications the policy
 // leaves out. The daemon redirects their fake addresses here, so both sides have
-// to agree on the same port without any configuration.
+// to agree on the same ports without any configuration. Established connections
+// and datagrams need separate endpoints because the daemon hands them over
+// through different mechanisms.
 internal const val MihomoTproxyFakeIpRelayPort = 65534
+internal const val MihomoTproxyFakeIpRelayDatagramPort = 65533
 
 internal object MihomoProfileFactory {
     fun buildProfileBytes(
@@ -194,6 +198,7 @@ private fun MutableMap<String, Any?>.putAsteriskRuntimeOverrides(
                 add(appState.toMihomoTproxyListenerYamlMap(tproxyPort))
                 if (appState.fakeIpRelayEnabled) {
                     add(appState.toMihomoFakeIpRelayListenerYamlMap())
+                    add(appState.toMihomoFakeIpRelayDatagramListenerYamlMap())
                 }
             })
         }
@@ -443,6 +448,21 @@ private fun AppState.toMihomoFakeIpRelayListenerYamlMap(): Map<String, Any?> {
         "type" to "redir",
         "listen" to "0.0.0.0",
         "port" to MihomoTproxyFakeIpRelayPort,
+        "proxy" to "DIRECT",
+    )
+}
+
+// Datagrams cannot take the redir inbound, which only serves TCP, so the daemon
+// hands them to a TPROXY inbound instead: it keeps the original destination,
+// which is the fake address, and the forced outbound keeps those applications
+// out of the proxy. It binds the port for TCP as well, which nothing uses.
+private fun AppState.toMihomoFakeIpRelayDatagramListenerYamlMap(): Map<String, Any?> {
+    return linkedMapOf(
+        "name" to MihomoTproxyFakeIpRelayDatagramInboundName,
+        "type" to "tproxy",
+        "listen" to "0.0.0.0",
+        "port" to MihomoTproxyFakeIpRelayDatagramPort,
+        "udp" to true,
         "proxy" to "DIRECT",
     )
 }
