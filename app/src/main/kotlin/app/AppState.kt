@@ -14,6 +14,7 @@ import app.modes.MihomoTunStackGvisor
 import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
 import app.modes.ProxyAppListModeWhitelist
+import app.modes.RunModeTproxy
 import app.modes.RunModeVpnService
 import app.modes.isRootRunMode
 import engine.root.RootModeEngine
@@ -163,19 +164,26 @@ val AppState.hasProxyAppList: Boolean
 val AppState.canScopeDnsToAppList: Boolean
     get() = runMode.isRootRunMode() && hasProxyAppList
 
-// While DNS follows the list, only the selected applications have their own DNS
-// queries intercepted and the platform resolver answers for applications the
-// list leaves out. The configured DNS answer mode is never overridden.
+// While the switch is on, the applications the list leaves out keep working even
+// though the platform resolver hands them the same fake answers as every other
+// application. The configured DNS answer mode is never overridden.
 val AppState.dnsFollowsAppList: Boolean
     get() = canScopeDnsToAppList && dnsHijackScope == DnsHijackScopeProxyApps
 
 val AppState.effectiveFakeIpEnabled: Boolean
     get() = effectiveLocalDnsEnabled && dnsEnhancedMode == MihomoDnsModeFakeIp
 
-// DNS interception covers the applications on the list while the switch is on,
-// and every application while it is off.
+// DNS interception always covers every application; the switch only decides
+// whether the daemon additionally keeps the excluded applications working.
 val AppState.effectiveDnsHijackScope: Int
     get() = if (dnsFollowsAppList) DnsHijackScopeProxyApps else DnsHijackScopeAllApps
+
+// DNS interception covers every application, because the platform resolver
+// answers for all of them at once. The applications the list leaves out are
+// therefore kept working by the core itself: the daemon redirects their fake
+// addresses to the core, which connects for them without the proxy.
+val AppState.fakeIpRelayEnabled: Boolean
+    get() = runMode == RunModeTproxy && dnsFollowsAppList && effectiveFakeIpEnabled
 
 fun AppState.withMihomoRestartRequired(
     profileId: Int,
