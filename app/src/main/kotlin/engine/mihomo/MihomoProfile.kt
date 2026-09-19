@@ -42,9 +42,15 @@ import utils.toTrimmedNonEmptyDistinctList
 
 internal const val Bpf2SocksRuntimeMarkerKey = "x-asteriskmeta-root-bpf2socks"
 internal const val MihomoTproxyInboundName = "asterisk-tproxy"
+internal const val MihomoTproxyFakeIpRelayInboundName = "asterisk-fakeip-relay"
 internal const val MihomoTunDevice = "asterisk0"
 internal const val MihomoTunInboundName = "asterisk-tun"
 internal const val MihomoTunRuntimeMarkerKey = "x-asteriskmeta-root-tun"
+
+// Fixed endpoint of the inbound that connects for the applications the policy
+// leaves out. The daemon redirects their fake addresses here, so both sides have
+// to agree on the same port without any configuration.
+internal const val MihomoTproxyFakeIpRelayPort = 65534
 
 internal object MihomoProfileFactory {
     fun buildProfileBytes(
@@ -183,7 +189,12 @@ private fun MutableMap<String, Any?>.putAsteriskRuntimeOverrides(
             }
         }
         if (runMode == RunModeTproxy) {
-            put("listeners", listOf(appState.toMihomoTproxyListenerYamlMap(tproxyPort)))
+            put("listeners", buildList {
+                add(appState.toMihomoTproxyListenerYamlMap(tproxyPort))
+                if (appState.fakeIpRelayEnabled) {
+                    add(appState.toMihomoFakeIpRelayListenerYamlMap())
+                }
+            })
         }
         if (runMode == RunModeTun2Socks || runMode == RunModeBpf2Socks) {
             put("socks-port", socksPort)
@@ -418,6 +429,20 @@ private fun AppState.toMihomoTproxyListenerYamlMap(port: Int): Map<String, Any?>
         "listen" to if (rootIpv6DataPathEnabled) "::" else "0.0.0.0",
         "port" to port,
         "udp" to true,
+    )
+}
+
+// The redirected connections keep their original destination, which is the fake
+// address the platform resolver answered with, so the core resolves it back to
+// its domain. The forced outbound keeps those applications out of the proxy.
+// The pool is IPv4 only, so the inbound stays on IPv4 as well.
+private fun AppState.toMihomoFakeIpRelayListenerYamlMap(): Map<String, Any?> {
+    return linkedMapOf(
+        "name" to MihomoTproxyFakeIpRelayInboundName,
+        "type" to "redir",
+        "listen" to "0.0.0.0",
+        "port" to MihomoTproxyFakeIpRelayPort,
+        "proxy" to "DIRECT",
     )
 }
 
