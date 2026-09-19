@@ -4,13 +4,18 @@
 package app
 
 import app.modes.ColorModeSystem
+import app.modes.DnsHijackScopeAllApps
+import app.modes.DnsHijackScopeProxyApps
 import app.modes.LanguageModeSystem
 import app.modes.MihomoModeRule
 import app.modes.MihomoProxyLayoutAuto
 import app.modes.MihomoProxySortDefault
 import app.modes.MihomoTunStackGvisor
+import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
+import app.modes.ProxyAppListModeWhitelist
 import app.modes.RunModeVpnService
+import app.modes.isRootRunMode
 import engine.root.RootModeEngine
 import engine.vpn.VpnDefaults
 import engine.mihomo.DefaultMihomoDnsDefaultNameserver
@@ -121,6 +126,7 @@ data class AppState(
     val dnsFallbackFilterIpcidr: List<String> = DefaultMihomoDnsFallbackFilterIpcidr,
     val dnsFallbackFilterDomain: List<String> = DefaultMihomoDnsFallbackFilterDomain,
     val dnsHosts: List<String> = emptyList(),
+    val dnsHijackScope: Int = DnsHijackScopeProxyApps,
 
     val transparentProxyPort: String = RootModeEngine.DefaultTproxyPort.toString(),
     val enableRootBootScript: Boolean = false,
@@ -148,8 +154,28 @@ val AppState.effectiveLocalDnsEnabled: Boolean
 val AppState.rootIpv6DataPathEnabled: Boolean
     get() = enableIpv6 || (effectiveLocalDnsEnabled && !enableRootIpv6Disabler)
 
+val AppState.hasProxyAppList: Boolean
+    get() = proxyAppListMode == ProxyAppListModeWhitelist || proxyAppListMode == ProxyAppListModeBlacklist
+
+// The DNS scope switch is offered by every per application ROOT mode that uses
+// an application list. Per application VPN keeps its answers inside the tunnel,
+// so it needs no scope switch.
+val AppState.canScopeDnsToAppList: Boolean
+    get() = runMode.isRootRunMode() && hasProxyAppList
+
+// While DNS follows the list, only the selected applications have their own DNS
+// queries intercepted and the platform resolver answers for applications the
+// list leaves out. The configured DNS answer mode is never overridden.
+val AppState.dnsFollowsAppList: Boolean
+    get() = canScopeDnsToAppList && dnsHijackScope == DnsHijackScopeProxyApps
+
 val AppState.effectiveFakeIpEnabled: Boolean
     get() = effectiveLocalDnsEnabled && dnsEnhancedMode == MihomoDnsModeFakeIp
+
+// DNS interception covers the applications on the list while the switch is on,
+// and every application while it is off.
+val AppState.effectiveDnsHijackScope: Int
+    get() = if (dnsFollowsAppList) DnsHijackScopeProxyApps else DnsHijackScopeAllApps
 
 fun AppState.withMihomoRestartRequired(
     profileId: Int,

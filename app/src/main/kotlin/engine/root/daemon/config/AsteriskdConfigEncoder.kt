@@ -74,6 +74,7 @@ private fun AsteriskdNetworkConfig.toJsonObject(): JsonObject = buildJsonObject 
     put("enableLocalDns", enableLocalDns)
     put("enableFakeDns", enableFakeDns)
     put("fakeDnsIpv4Pool", fakeDnsIpv4Pool?.let(::JsonPrimitive) ?: JsonNull)
+    put("dnsHijackScope", dnsHijackScope.wireValue)
     put("ignoredInterfaces", ignoredInterfaces.toJsonArray())
     put("virtualInterfaces", virtualInterfaces.toJsonArray())
     put("hotspotInterfacePrefixes", hotspotInterfacePrefixes.toJsonArray())

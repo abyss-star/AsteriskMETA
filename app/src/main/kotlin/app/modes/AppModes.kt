@@ -29,6 +29,12 @@ const val ProxyAppListModeBlacklist = 0
 const val ProxyAppListModeWhitelist = 1
 const val ProxyAppListModeGlobal = 2
 
+// Locally generated DNS queries either follow the application policy or are
+// intercepted for every application. The global application policy always
+// intercepts every application because all of them are proxied.
+const val DnsHijackScopeAllApps = 0
+const val DnsHijackScopeProxyApps = 1
+
 const val MihomoProxyLayoutAuto = 0
 const val MihomoProxyLayoutSingle = 1
 const val MihomoProxyLayoutDouble = 2

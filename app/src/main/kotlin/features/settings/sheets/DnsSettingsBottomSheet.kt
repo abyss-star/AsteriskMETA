@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.R
 import ui.icons.AsteriskIcons as Icons
+import app.modes.DnsHijackScopeAllApps
+import app.modes.DnsHijackScopeProxyApps
 import engine.mihomo.DefaultMihomoDnsFakeIpRange
 import engine.mihomo.MihomoDnsModeFakeIp
 import engine.mihomo.MihomoDnsModeValues
@@ -62,6 +64,7 @@ internal fun DnsSettingsBottomSheet(
     onDraftChange: (DnsSettingsDraft) -> Unit,
     onDismissRequest: () -> Unit,
     onSave: (DnsSettingsDraft) -> Unit,
+    appListDnsScopeAvailable: Boolean = false,
 ) {
     val dnsServerInvalidMessage = stringResource(R.string.settings_dns_server_invalid)
     val dnsDomainInvalidMessage = stringResource(R.string.settings_dns_domain_invalid)
@@ -71,6 +74,8 @@ internal fun DnsSettingsBottomSheet(
     val dnsGeoipCodeInvalidMessage = stringResource(R.string.settings_dns_geoip_code_invalid)
 
     val sanitizedDraft = draft.sanitized()
+    val appListDnsScopeEnabled =
+        appListDnsScopeAvailable && draft.dnsHijackScope == DnsHijackScopeProxyApps
     val fakeIpRangeError = if (
         sanitizedDraft.dnsEnhancedMode != MihomoDnsModeFakeIp ||
         isIpv4CidrAddress(draft.dnsFakeIpRange)
@@ -122,6 +127,25 @@ internal fun DnsSettingsBottomSheet(
                         checked = draft.enableLocalDns,
                         onCheckedChange = { onDraftChange(draft.copy(enableLocalDns = it)) },
                     )
+                    if (appListDnsScopeAvailable) {
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_dns_hijack_proxy_apps_only),
+                            icon = Icons.Rounded.FilterAlt,
+                            summary = stringResource(R.string.settings_dns_hijack_proxy_apps_only_summary),
+                            checked = draft.dnsHijackScope == DnsHijackScopeProxyApps,
+                            onCheckedChange = { enabled ->
+                                onDraftChange(
+                                    draft.copy(
+                                        dnsHijackScope = if (enabled) {
+                                            DnsHijackScopeProxyApps
+                                        } else {
+                                            DnsHijackScopeAllApps
+                                        },
+                                    ),
+                                )
+                            },
+                        )
+                    }
                     SwitchPreference(
                         title = stringResource(R.string.settings_dns_override),
                         icon = Icons.AutoMirrored.Rounded.AltRoute,
@@ -136,6 +160,14 @@ internal fun DnsSettingsBottomSheet(
                         selectedIndex = draft.dnsEnhancedMode.coerceIn(MihomoDnsModeValues.indices),
                         onSelectedIndexChange = { onDraftChange(draft.copy(dnsEnhancedMode = it)) },
                     )
+                    if (appListDnsScopeEnabled && draft.dnsEnhancedMode == MihomoDnsModeFakeIp) {
+                        Text(
+                            text = stringResource(R.string.settings_dns_fake_ip_app_list_note),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
                     SwitchPreference(
                         title = stringResource(R.string.settings_dns_respect_rules),
                         icon = Icons.Rounded.Policy,
@@ -372,6 +404,11 @@ internal fun DnsSettingsDraft.sanitized(): DnsSettingsDraft {
         dnsFallbackFilterIpcidr = dnsFallbackFilterIpcidr.toTrimmedNonEmptyDistinctList(),
         dnsFallbackFilterDomain = dnsFallbackFilterDomain.toTrimmedNonEmptyDistinctList(),
         dnsHosts = dnsHosts.toTrimmedNonEmptyDistinctList(),
+        dnsHijackScope = if (dnsHijackScope == DnsHijackScopeAllApps) {
+            DnsHijackScopeAllApps
+        } else {
+            DnsHijackScopeProxyApps
+        },
     )
 }
 

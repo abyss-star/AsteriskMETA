@@ -331,7 +331,7 @@ private fun AppState.toMihomoDnsYamlMap(
         put("default-nameserver", dnsDefaultNameserver.toTrimmedNonEmptyDistinctList().ifEmpty {
             DefaultMihomoDnsDefaultNameserver
         })
-        put("enhanced-mode", dnsEnhancedModeName())
+        put("enhanced-mode", dnsEnhancedModeName(dnsEnhancedMode))
         if (dnsEnhancedMode == MihomoDnsModeFakeIp) {
             val fakeIpRange = dnsFakeIpRange.trim()
                 .takeIf(::isIpv4CidrAddress)
@@ -445,8 +445,8 @@ private fun normalizedRulesWithUdpDnsHijack(value: Any?): List<Any?> {
     return listOf(UdpDnsHijackRule) + rules
 }
 
-private fun AppState.dnsEnhancedModeName(): String {
-    return MihomoDnsModeValues.getOrElse(dnsEnhancedMode) { MihomoDnsModeValues[MihomoDnsModeRedirHost] }
+private fun AppState.dnsEnhancedModeName(mode: Int = dnsEnhancedMode): String {
+    return MihomoDnsModeValues.getOrElse(mode) { MihomoDnsModeValues[MihomoDnsModeRedirHost] }
 }
 
 private fun AppState.toMihomoFallbackFilterYamlMap(): Map<String, Any?> {

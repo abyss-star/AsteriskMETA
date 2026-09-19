@@ -476,6 +476,7 @@ fun ProxyAppListPage(
                     Text(stringResource(R.string.proxy_app_list_help_blacklist))
                     Text(stringResource(R.string.proxy_app_list_help_global))
                     Text(stringResource(R.string.proxy_app_list_help_whitelist))
+                    Text(stringResource(R.string.proxy_app_list_help_dns))
                 }
             },
             confirmButton = {
