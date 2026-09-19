@@ -14,9 +14,10 @@ import app.modes.MihomoTunStackGvisor
 import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
 import app.modes.ProxyAppListModeWhitelist
+import app.modes.RunModeBpf2Socks
 import app.modes.RunModeTproxy
+import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
-import app.modes.isRootRunMode
 import engine.root.RootModeEngine
 import engine.vpn.VpnDefaults
 import engine.mihomo.DefaultMihomoDnsDefaultNameserver
@@ -158,11 +159,13 @@ val AppState.rootIpv6DataPathEnabled: Boolean
 val AppState.hasProxyAppList: Boolean
     get() = proxyAppListMode == ProxyAppListModeWhitelist || proxyAppListMode == ProxyAppListModeBlacklist
 
-// The DNS scope switch is offered by every per application ROOT mode that uses
-// an application list. Per application VPN keeps its answers inside the tunnel,
-// so it needs no scope switch.
+// The DNS scope switch is offered by the ROOT modes that enforce their
+// application policy outside the core, because only there can the daemon keep
+// the applications the policy leaves out working. Per application VPN and a TUN
+// mode keep their policy and their answers on the same side of the tunnel.
 val AppState.canScopeDnsToAppList: Boolean
-    get() = runMode.isRootRunMode() && hasProxyAppList
+    get() = (runMode == RunModeTproxy || runMode == RunModeTun2Socks ||
+        runMode == RunModeBpf2Socks) && hasProxyAppList
 
 // While the switch is on, the applications the list leaves out keep working even
 // though the platform resolver hands them the same fake answers as every other
@@ -181,9 +184,11 @@ val AppState.effectiveDnsHijackScope: Int
 // DNS interception covers every application, because the platform resolver
 // answers for all of them at once. The applications the list leaves out are
 // therefore kept working by the core itself: the daemon redirects their fake
-// addresses to the core, which connects for them without the proxy.
+// addresses to a direct inbound of the core, which connects for them without the
+// proxy. Every mode whose policy the daemon enforces delivers them that way.
 val AppState.fakeIpRelayEnabled: Boolean
-    get() = runMode == RunModeTproxy && dnsFollowsAppList && effectiveFakeIpEnabled
+    get() = (runMode == RunModeTproxy || runMode == RunModeTun2Socks ||
+        runMode == RunModeBpf2Socks) && dnsFollowsAppList && effectiveFakeIpEnabled
 
 fun AppState.withMihomoRestartRequired(
     profileId: Int,

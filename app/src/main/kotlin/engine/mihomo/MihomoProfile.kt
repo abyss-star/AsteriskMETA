@@ -194,13 +194,14 @@ private fun MutableMap<String, Any?>.putAsteriskRuntimeOverrides(
         if (runMode == RunModeTproxy) {
             put("listeners", buildList {
                 add(appState.toMihomoTproxyListenerYamlMap(tproxyPort))
-                if (appState.fakeIpRelayEnabled) {
-                    add(appState.toMihomoFakeIpRelayListenerYamlMap())
-                }
+                addAll(appState.fakeIpRelayListenerYamlMaps())
             })
         }
         if (runMode == RunModeTun2Socks || runMode == RunModeBpf2Socks) {
             put("socks-port", socksPort)
+            // The bridge modes reach the core through this socket, and the relay
+            // arrives beside it on its own transparent endpoint.
+            put("listeners", appState.fakeIpRelayListenerYamlMaps())
         }
         if (runMode == RunModeBpf2Socks) {
             put(Bpf2SocksRuntimeMarkerKey, true)
@@ -345,7 +346,7 @@ private fun AppState.toMihomoDnsYamlMap(
         put("default-nameserver", dnsDefaultNameserver.toTrimmedNonEmptyDistinctList().ifEmpty {
             DefaultMihomoDnsDefaultNameserver
         })
-        put("enhanced-mode", dnsEnhancedModeName(dnsEnhancedMode))
+        put("enhanced-mode", dnsEnhancedModeName())
         if (dnsEnhancedMode == MihomoDnsModeFakeIp) {
             val fakeIpRange = dnsFakeIpRange.trim()
                 .takeIf(::isIpv4CidrAddress)
@@ -452,6 +453,11 @@ private fun AppState.toMihomoFakeIpRelayListenerYamlMap(): Map<String, Any?> {
     )
 }
 
+// The daemon delivers the relay the same way in every mode it enforces the
+// application policy in, so the profile only decides whether the endpoint exists.
+private fun AppState.fakeIpRelayListenerYamlMaps(): List<Map<String, Any?>> =
+    if (fakeIpRelayEnabled) listOf(toMihomoFakeIpRelayListenerYamlMap()) else emptyList()
+
 private fun normalizedProxiesWithDnsOut(value: Any?): List<Any?> {
     val proxies = (value as? List<*>)?.map(::normalizeYamlValue).orEmpty()
     if (proxies.any(::isDnsOutProxy)) {
@@ -476,8 +482,8 @@ private fun normalizedRulesWithUdpDnsHijack(value: Any?): List<Any?> {
     return listOf(UdpDnsHijackRule) + rules
 }
 
-private fun AppState.dnsEnhancedModeName(mode: Int = dnsEnhancedMode): String {
-    return MihomoDnsModeValues.getOrElse(mode) { MihomoDnsModeValues[MihomoDnsModeRedirHost] }
+private fun AppState.dnsEnhancedModeName(): String {
+    return MihomoDnsModeValues.getOrElse(dnsEnhancedMode) { MihomoDnsModeValues[MihomoDnsModeRedirHost] }
 }
 
 private fun AppState.toMihomoFallbackFilterYamlMap(): Map<String, Any?> {

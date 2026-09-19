@@ -17,9 +17,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.R
-import ui.icons.AsteriskIcons as Icons
 import app.modes.DnsHijackScopeAllApps
 import app.modes.DnsHijackScopeProxyApps
+import ui.icons.AsteriskIcons as Icons
 import engine.mihomo.DefaultMihomoDnsFakeIpRange
 import engine.mihomo.MihomoDnsModeFakeIp
 import engine.mihomo.MihomoDnsModeValues
