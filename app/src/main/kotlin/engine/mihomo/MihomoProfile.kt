@@ -8,6 +8,7 @@ import app.AppState
 import app.DefaultMihomoOverrideScriptId
 import app.MihomoProfileState
 import app.effectiveLocalDnsEnabled
+import app.fakeIpRelayEnabled
 import app.modes.MihomoModeDirect
 import app.modes.MihomoModeGlobal
 import app.modes.MihomoTunStackGvisor
