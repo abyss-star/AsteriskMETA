@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -103,3 +104,10 @@ jobs:
 
       - name: Assemble release APKs
         run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Upload unsigned release APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-release-unsigned
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
