@@ -44,18 +44,16 @@ import utils.toTrimmedNonEmptyDistinctList
 internal const val Bpf2SocksRuntimeMarkerKey = "x-asteriskmeta-root-bpf2socks"
 internal const val MihomoTproxyInboundName = "asterisk-tproxy"
 internal const val MihomoTproxyFakeIpRelayInboundName = "asterisk-fakeip-relay"
-internal const val MihomoTproxyFakeIpRelayDatagramInboundName = "asterisk-fakeip-relay-datagram"
 internal const val MihomoTunDevice = "asterisk0"
 internal const val MihomoTunInboundName = "asterisk-tun"
 internal const val MihomoTunRuntimeMarkerKey = "x-asteriskmeta-root-tun"
 
-// Fixed endpoints of the inbounds that connect for the applications the policy
-// leaves out. The daemon redirects their fake addresses here, so both sides have
-// to agree on the same ports without any configuration. Established connections
-// and datagrams need separate endpoints because the daemon hands them over
-// through different mechanisms.
+// Fixed endpoint of the inbound that connects for the applications the policy
+// leaves out. The daemon hands their fake addresses over here, so both sides
+// have to agree on the same port without any configuration. One endpoint serves
+// both transports, because the core's transparent inbound takes connections and
+// datagrams on the same port.
 internal const val MihomoTproxyFakeIpRelayPort = 65534
-internal const val MihomoTproxyFakeIpRelayDatagramPort = 65533
 
 internal object MihomoProfileFactory {
     fun buildProfileBytes(
@@ -198,7 +196,6 @@ private fun MutableMap<String, Any?>.putAsteriskRuntimeOverrides(
                 add(appState.toMihomoTproxyListenerYamlMap(tproxyPort))
                 if (appState.fakeIpRelayEnabled) {
                     add(appState.toMihomoFakeIpRelayListenerYamlMap())
-                    add(appState.toMihomoFakeIpRelayDatagramListenerYamlMap())
                 }
             })
         }
@@ -438,30 +435,18 @@ private fun AppState.toMihomoTproxyListenerYamlMap(port: Int): Map<String, Any?>
     )
 }
 
-// The redirected connections keep their original destination, which is the fake
-// address the platform resolver answered with, so the core resolves it back to
-// its domain. The forced outbound keeps those applications out of the proxy.
-// The pool is IPv4 only, so the inbound stays on IPv4 as well.
+// The connections and datagrams handed over here keep their original
+// destination, which is the fake address the platform resolver answered with,
+// so the core resolves it back to its domain. The forced outbound keeps those
+// applications out of the proxy. The pool is IPv4 only, so the inbound stays on
+// IPv4 as well. A transparent inbound takes both transports on one port, which
+// is why the relay needs no second endpoint.
 private fun AppState.toMihomoFakeIpRelayListenerYamlMap(): Map<String, Any?> {
     return linkedMapOf(
         "name" to MihomoTproxyFakeIpRelayInboundName,
-        "type" to "redir",
-        "listen" to "0.0.0.0",
-        "port" to MihomoTproxyFakeIpRelayPort,
-        "proxy" to "DIRECT",
-    )
-}
-
-// Datagrams cannot take the redir inbound, which only serves TCP, so the daemon
-// hands them to a TPROXY inbound instead: it keeps the original destination,
-// which is the fake address, and the forced outbound keeps those applications
-// out of the proxy. It binds the port for TCP as well, which nothing uses.
-private fun AppState.toMihomoFakeIpRelayDatagramListenerYamlMap(): Map<String, Any?> {
-    return linkedMapOf(
-        "name" to MihomoTproxyFakeIpRelayDatagramInboundName,
         "type" to "tproxy",
         "listen" to "0.0.0.0",
-        "port" to MihomoTproxyFakeIpRelayDatagramPort,
+        "port" to MihomoTproxyFakeIpRelayPort,
         "udp" to true,
         "proxy" to "DIRECT",
     )
