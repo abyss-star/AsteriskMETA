@@ -635,7 +635,6 @@
     <string name="settings_dns_enhanced_mode">Enhanced mode</string>
     <string name="settings_dns_hijack_proxy_apps_only">Keep unproxied apps working</string>
     <string name="settings_dns_hijack_proxy_apps_only_summary">Apps the proxy leaves out stay direct: the core connects the fake addresses they receive for them. Restart the proxy to apply.</string>
-    <string name="settings_dns_fake_ip_app_list_note">Apps the proxy leaves out also receive fake addresses; the core connects them directly.</string>
     <string name="settings_dns_respect_rules">Respect rules</string>
     <string name="settings_dns_prefer_h3">Prefer HTTP/3</string>
     <string name="settings_dns_fake_ip_range">Fake IP range</string>

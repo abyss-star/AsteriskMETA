@@ -622,7 +622,6 @@
     <string name="settings_dns_enhanced_mode">增强模式</string>
     <string name="settings_dns_hijack_proxy_apps_only">未被代理的应用不受影响</string>
     <string name="settings_dns_hijack_proxy_apps_only_summary">未走代理的应用照常直连：核心代为连接它们收到的假地址。重新启动代理后生效。</string>
-    <string name="settings_dns_fake_ip_app_list_note">未走代理的应用也会收到假地址，连接由核心按直连处理。</string>
     <string name="settings_dns_respect_rules">遵循规则</string>
     <string name="settings_dns_prefer_h3">优先 HTTP/3</string>
     <string name="settings_dns_fake_ip_range">Fake IP 地址池</string>

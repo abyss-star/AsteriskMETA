@@ -74,8 +74,10 @@ internal fun DnsSettingsBottomSheet(
     val dnsGeoipCodeInvalidMessage = stringResource(R.string.settings_dns_geoip_code_invalid)
 
     val sanitizedDraft = draft.sanitized()
-    val appListDnsScopeEnabled =
-        appListDnsScopeAvailable && draft.dnsHijackScope == DnsHijackScopeProxyApps
+    // The switch is offered where it can act: fake answers are what make the
+    // applications outside the list depend on the core connecting for them.
+    val appListDnsScopeOffered =
+        appListDnsScopeAvailable && draft.dnsEnhancedMode == MihomoDnsModeFakeIp
     val fakeIpRangeError = if (
         sanitizedDraft.dnsEnhancedMode != MihomoDnsModeFakeIp ||
         isIpv4CidrAddress(draft.dnsFakeIpRange)
@@ -127,7 +129,25 @@ internal fun DnsSettingsBottomSheet(
                         checked = draft.enableLocalDns,
                         onCheckedChange = { onDraftChange(draft.copy(enableLocalDns = it)) },
                     )
-                    if (appListDnsScopeAvailable) {
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_dns_override),
+                        icon = Icons.AutoMirrored.Rounded.AltRoute,
+                        summary = stringResource(R.string.settings_dns_override_summary),
+                        checked = draft.overrideDns,
+                        onCheckedChange = { onDraftChange(draft.copy(overrideDns = it)) },
+                    )
+                    WindowDropdownPreference(
+                        title = stringResource(R.string.settings_dns_enhanced_mode),
+                        icon = Icons.Rounded.Tune,
+                        items = MihomoDnsModeValues,
+                        selectedIndex = draft.dnsEnhancedMode.coerceIn(MihomoDnsModeValues.indices),
+                        onSelectedIndexChange = { onDraftChange(draft.copy(dnsEnhancedMode = it)) },
+                    )
+                    AnimatedVisibility(
+                        visible = appListDnsScopeOffered,
+                        enter = AsteriskMotion.contentEnter(),
+                        exit = AsteriskMotion.contentExit(),
+                    ) {
                         SwitchPreference(
                             title = stringResource(R.string.settings_dns_hijack_proxy_apps_only),
                             icon = Icons.Rounded.FilterAlt,
@@ -144,28 +164,6 @@ internal fun DnsSettingsBottomSheet(
                                     ),
                                 )
                             },
-                        )
-                    }
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_dns_override),
-                        icon = Icons.AutoMirrored.Rounded.AltRoute,
-                        summary = stringResource(R.string.settings_dns_override_summary),
-                        checked = draft.overrideDns,
-                        onCheckedChange = { onDraftChange(draft.copy(overrideDns = it)) },
-                    )
-                    WindowDropdownPreference(
-                        title = stringResource(R.string.settings_dns_enhanced_mode),
-                        icon = Icons.Rounded.Tune,
-                        items = MihomoDnsModeValues,
-                        selectedIndex = draft.dnsEnhancedMode.coerceIn(MihomoDnsModeValues.indices),
-                        onSelectedIndexChange = { onDraftChange(draft.copy(dnsEnhancedMode = it)) },
-                    )
-                    if (appListDnsScopeEnabled && draft.dnsEnhancedMode == MihomoDnsModeFakeIp) {
-                        Text(
-                            text = stringResource(R.string.settings_dns_fake_ip_app_list_note),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(16.dp),
                         )
                     }
                     SwitchPreference(
