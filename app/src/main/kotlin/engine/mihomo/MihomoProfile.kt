@@ -22,6 +22,7 @@ import app.modes.RunModeTun2Socks
 import app.modes.isRootRunMode
 import app.resourceFileUpdateSource
 import app.rootIpv6DataPathEnabled
+import engine.network.NetworkLimits
 import engine.network.isIpv4CidrAddress
 import engine.network.toPortOrNull
 import engine.proxy.LocalProxyLoopbackAddress
@@ -53,7 +54,7 @@ internal const val MihomoTunRuntimeMarkerKey = "x-asteriskmeta-root-tun"
 // sides have to agree on the same port. One endpoint serves both transports,
 // because the core's transparent inbound takes connections and datagrams on the
 // same port.
-internal const val MihomoTproxyFakeIpRelayPort = 65534
+internal const val MihomoTproxyFakeIpRelayPort = NetworkLimits.PORT_MAX - 1
 
 // The relay arrives on an inbound of its own, and a port carries one inbound, so
 // it moves aside for every endpoint the mode already has: the ones it proxies

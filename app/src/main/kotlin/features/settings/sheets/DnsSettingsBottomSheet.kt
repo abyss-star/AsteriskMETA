@@ -64,7 +64,7 @@ internal fun DnsSettingsBottomSheet(
     onDraftChange: (DnsSettingsDraft) -> Unit,
     onDismissRequest: () -> Unit,
     onSave: (DnsSettingsDraft) -> Unit,
-    appListDnsScopeAvailable: Boolean = false,
+    appListDnsScopeAvailable: Boolean,
 ) {
     val dnsServerInvalidMessage = stringResource(R.string.settings_dns_server_invalid)
     val dnsDomainInvalidMessage = stringResource(R.string.settings_dns_domain_invalid)
