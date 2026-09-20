@@ -29,9 +29,11 @@ const val ProxyAppListModeBlacklist = 0
 const val ProxyAppListModeWhitelist = 1
 const val ProxyAppListModeGlobal = 2
 
-// Locally generated DNS queries either follow the application policy or are
-// intercepted for every application. The global application policy always
-// intercepts every application because all of them are proxied.
+// Interception itself always covers every application, because the platform
+// resolver answers for all of them at once. The scope only decides whether the
+// applications the list leaves out are kept working: with the application policy
+// the daemon connects the fake addresses they receive for them, and globally they
+// are left to the answer they got.
 const val DnsHijackScopeAllApps = 0
 const val DnsHijackScopeProxyApps = 1
 

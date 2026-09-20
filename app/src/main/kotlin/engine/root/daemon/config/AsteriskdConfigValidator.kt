@@ -14,9 +14,8 @@ internal object AsteriskdConfigValidator {
         AsteriskdMetaConfigFactory.requireRunnableMode(mode)
         require(!(network.enableIpv6 && network.disableSystemIpv6))
         require(network.enableFakeDns == (network.fakeDnsIpv4Pool != null))
-        // The DNS answer mode is the user's choice and stays untouched by the
-        // scope; the scope itself keeps platform resolver queries out of the
-        // proxy, so fake answers cannot reach an application outside the policy.
+        // Following the application policy for DNS only means something while an
+        // application policy exists: the global policy already covers every uid.
         require(
             network.dnsHijackScope == AsteriskdDnsHijackScope.Global ||
                 network.appPolicy.mode != AsteriskdAppPolicyMode.Global,

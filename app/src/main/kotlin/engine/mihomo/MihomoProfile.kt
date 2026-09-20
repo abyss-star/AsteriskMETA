@@ -55,15 +55,23 @@ internal const val MihomoTunRuntimeMarkerKey = "x-asteriskmeta-root-tun"
 // same port.
 internal const val MihomoTproxyFakeIpRelayPort = 65534
 
-// The relay arrives on an inbound of its own, and a port carries one inbound:
-// the bridge modes keep their SOCKS inbound, which the tunnel helper dials, on
-// the preferred port, so there the relay moves to the next free one. Both the
+// The relay arrives on an inbound of its own, and a port carries one inbound, so
+// it moves aside for every endpoint the mode already has: the ones it proxies
+// with, the control endpoint, and the bridge the BPF helper listens on. The
+// bridge modes keep their SOCKS inbound, which the tunnel helper dials, on the
+// preferred port, which is why the relay takes the next free one there. Both the
 // profile and the daemon are told the same number.
 internal fun AppState.fakeIpRelayPort(): Int {
-    val taken = if (runMode == RunModeTproxy) {
-        listOfNotNull(transparentProxyPort.toPortOrNull(), localProxyPort.toPortOrNull())
-    } else {
-        listOfNotNull(socks5ProxyPort.toPortOrNull(), localProxyPort.toPortOrNull())
+    val taken = buildSet {
+        add(mihomoControlConfig().port)
+        if (runMode == RunModeTproxy) {
+            addAll(listOfNotNull(transparentProxyPort.toPortOrNull(), localProxyPort.toPortOrNull()))
+        } else {
+            addAll(listOfNotNull(socks5ProxyPort.toPortOrNull(), localProxyPort.toPortOrNull()))
+        }
+        if (runMode == RunModeBpf2Socks) {
+            add(bpf2SocksBridgePort.toPortOrNull() ?: RootModeEngine.DefaultBpf2SocksBridgePort)
+        }
     }
     return (MihomoTproxyFakeIpRelayPort downTo 1).first { it !in taken }
 }
