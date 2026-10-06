@@ -440,6 +440,8 @@
     <string name="settings_dns_domain">域名</string>
     <string name="settings_dns_domain_invalid">无效 DNS 域名规则</string>
     <string name="settings_dns_enhanced_mode">增强模式</string>
+    <string name="settings_dns_module_scope">由 Zygisk 模块提供 DNS</string>
+    <string name="settings_dns_module_scope_summary">关闭代理的全局 DNS 劫持：名单内的应用在进程内解析，名单外的应用照常使用系统解析。需要 fake-ip 与 fakeip 模块；改后重启代理与目标应用。</string>
     <string name="settings_dns_fake_ip_filter">Fake IP 过滤</string>
     <string name="settings_dns_fake_ip_range">Fake IP 地址池</string>
     <string name="settings_dns_fallback">Fallback</string>
@@ -721,6 +723,7 @@
     <string name="proxy_app_list_help_global">全应用模式：所有应用均使用代理。</string>
     <string name="proxy_app_list_help_title">分应用代理模式</string>
     <string name="proxy_app_list_help_whitelist">白名单模式：仅名单中的应用使用代理，其他应用均不使用代理。</string>
+    <string name="proxy_app_list_help_dns">DNS：开启「由 Zygisk 模块提供 DNS」后，名单内的应用在进程内解析，名单外的应用照常使用系统解析。</string>
     <string name="proxy_app_list_import_clipboard_message">检测到 {count} 个应用，请选择导入方式</string>
     <string name="proxy_app_list_import_clipboard_title">导入应用名单</string>
     <string name="proxy_app_list_import_invalid_entry">应用名单条目无效</string>

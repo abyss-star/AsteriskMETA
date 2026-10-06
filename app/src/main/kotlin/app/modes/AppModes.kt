@@ -29,6 +29,17 @@ const val ProxyAppListModeBlacklist = 0
 const val ProxyAppListModeWhitelist = 1
 const val ProxyAppListModeGlobal = 2
 
+// Interception itself always covers every application, because the platform
+// resolver answers for all of them at once. The scope decides where the answer is
+// taken: globally the proxy resolves for everyone, while this scope hands the
+// decision to a module inside the application process, which is the only place
+// where a query can still be attributed to the application that asked for it.
+const val DnsHijackScopeAllApps = 0
+
+// Kept at 2 so a preference stored by an earlier build can never be read as this
+// scope; every other stored value means the global scope.
+const val DnsHijackScopeModule = 2
+
 const val MihomoProxyLayoutAuto = 0
 const val MihomoProxyLayoutSingle = 1
 const val MihomoProxyLayoutDouble = 2

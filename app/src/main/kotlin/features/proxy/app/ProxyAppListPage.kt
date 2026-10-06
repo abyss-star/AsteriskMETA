@@ -4,6 +4,15 @@
 package features.proxy.app
 
 import android.content.pm.PackageManager
+import app.canScopeDnsToAppList
+import app.modes.ProxyAppListModeBlacklist
+import app.modes.ProxyAppListModeGlobal
+import app.modes.ProxyAppListModeWhitelist
+import features.proxy.app.model.name
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+
 import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -52,23 +61,16 @@ import app.LocalIsWideScreen
 import app.LocalUpdateAppState
 import app.R
 import app.collectAppState
-import app.modes.ProxyAppListModeBlacklist
-import app.modes.ProxyAppListModeGlobal
-import app.modes.ProxyAppListModeWhitelist
 import app.modes.RunModeVpnService
 import app.requiresGlobalProxyAppMode
 import features.proxy.app.model.ProxyAppListItem
 import features.proxy.app.model.ProxyAppListUserSpaceTabUi
-import features.proxy.app.model.name
 import features.proxy.app.usecase.ProxyAppListClipboardData
 import features.proxy.app.usecase.applyProxyAppListClipboardImport
 import features.proxy.app.usecase.decodeProxyAppListFromClipboard
 import features.proxy.app.usecase.encodeProxyAppListForClipboard
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import system.ANDROID_APP_ICON_SIZE_DP
 import ui.clipboard.ClipboardImportException
 import ui.clipboard.ClipboardImportFailure
@@ -471,6 +473,11 @@ fun ProxyAppListPage(
                     Text(stringResource(R.string.proxy_app_list_help_blacklist))
                     Text(stringResource(R.string.proxy_app_list_help_global))
                     Text(stringResource(R.string.proxy_app_list_help_whitelist))
+                    // The DNS switch exists only where the daemon enforces the
+                    // application policy itself, so the help follows the switch.
+                    if (appState.canScopeDnsToAppList) {
+                        Text(stringResource(R.string.proxy_app_list_help_dns))
+                    }
                 }
             },
             confirmButton = {

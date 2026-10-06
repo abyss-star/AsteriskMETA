@@ -8,6 +8,7 @@ import app.modes.MihomoTunStackMips
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
 import engine.mihomo.DefaultMihomoTunCongestionController
+import app.modes.DnsHijackScopeAllApps
 import engine.mihomo.DefaultMihomoSnifferHttpPorts
 import engine.mihomo.DefaultMihomoSnifferQuicPorts
 import engine.mihomo.DefaultMihomoSnifferTlsPorts
@@ -82,6 +83,7 @@ internal data class DnsSettingsDraft(
     val dnsFallbackFilterIpcidr: List<String> = emptyList(),
     val dnsFallbackFilterDomain: List<String> = emptyList(),
     val dnsHosts: List<String> = emptyList(),
+    val dnsHijackScope: Int = DnsHijackScopeAllApps,
 )
 
 internal fun AppState.toDnsSettingsDraft(): DnsSettingsDraft {
@@ -106,6 +108,7 @@ internal fun AppState.toDnsSettingsDraft(): DnsSettingsDraft {
         dnsFallbackFilterIpcidr = dnsFallbackFilterIpcidr,
         dnsFallbackFilterDomain = dnsFallbackFilterDomain,
         dnsHosts = dnsHosts,
+        dnsHijackScope = dnsHijackScope,
     )
 }
 

@@ -451,6 +451,8 @@
     <string name="settings_dns_domain">Domain</string>
     <string name="settings_dns_domain_invalid">Invalid DNS domain rule</string>
     <string name="settings_dns_enhanced_mode">Enhanced mode</string>
+    <string name="settings_dns_module_scope">Serve DNS through the Zygisk module</string>
+    <string name="settings_dns_module_scope_summary">Turns off the proxy-wide DNS interception: the listed apps resolve inside their own process and everything else keeps the system resolver. Needs fake IP and the fakeip module; restart the proxy and the target apps afterwards.</string>
     <string name="settings_dns_fake_ip_filter">Fake IP filter</string>
     <string name="settings_dns_fake_ip_range">Fake IP range</string>
     <string name="settings_dns_fallback">Fallback</string>
@@ -732,6 +734,7 @@
     <string name="proxy_app_list_help_global">All-app mode: every app uses the proxy.</string>
     <string name="proxy_app_list_help_title">App proxy modes</string>
     <string name="proxy_app_list_help_whitelist">Whitelist mode: only apps on the whitelist use the proxy; everything else bypasses it.</string>
+    <string name="proxy_app_list_help_dns">DNS: with "Serve DNS through the Zygisk module" enabled, apps on the list resolve inside their own process and everything else keeps the system resolver.</string>
     <string name="proxy_app_list_import_clipboard_message">Detected {count} apps. Choose how to import.</string>
     <string name="proxy_app_list_import_clipboard_title">Import app list</string>
     <string name="proxy_app_list_import_invalid_entry">Invalid app list entry</string>

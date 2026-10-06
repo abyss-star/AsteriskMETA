@@ -4,13 +4,21 @@
 package app
 
 import app.modes.ColorModeSystem
+import app.modes.DnsHijackScopeAllApps
+import app.modes.DnsHijackScopeModule
 import app.modes.LanguageModeSystem
 import app.modes.MihomoModeRule
 import app.modes.MihomoProxyLayoutAuto
 import app.modes.MihomoProxySortDefault
 import app.modes.MihomoTunStackMips
 import engine.mihomo.DefaultMihomoTunCongestionController
+import app.modes.MihomoTunStackGvisor
+import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
+import app.modes.ProxyAppListModeWhitelist
+import app.modes.RunModeBpf2Socks
+import app.modes.RunModeTproxy
+import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
 import app.modes.isRootRunMode
 import engine.root.RootModeEngine
@@ -122,6 +130,7 @@ data class AppState(
     val dnsFallbackFilterIpcidr: List<String> = DefaultMihomoDnsFallbackFilterIpcidr,
     val dnsFallbackFilterDomain: List<String> = DefaultMihomoDnsFallbackFilterDomain,
     val dnsHosts: List<String> = emptyList(),
+    val dnsHijackScope: Int = DnsHijackScopeAllApps,
 
     val transparentProxyPort: String = RootModeEngine.DefaultTproxyPort.toString(),
     val enableRootBootScript: Boolean = false,
@@ -149,11 +158,37 @@ val AppState.effectiveLocalDnsEnabled: Boolean
 val AppState.rootIpv6DataPathEnabled: Boolean
     get() = enableIpv6 || (effectiveLocalDnsEnabled && !enableRootIpv6Disabler)
 
+val AppState.hasProxyAppList: Boolean
+    get() = proxyAppListMode == ProxyAppListModeWhitelist || proxyAppListMode == ProxyAppListModeBlacklist
+
+// The DNS scope switch is offered by the ROOT modes that enforce their
+// application policy outside the core, because only there can the daemon keep
+// the applications the policy leaves out working. Per application VPN and a TUN
+// mode keep their policy and their answers on the same side of the tunnel.
+// It also stays offered while fake answers hold the list at the global mode: a
+// scope that keeps the excluded applications working is what makes a list
+// possible again, so hiding the switch there would lock the list away for good.
+val AppState.canScopeDnsToAppList: Boolean
+    get() = (runMode == RunModeTproxy || runMode == RunModeTun2Socks ||
+        runMode == RunModeBpf2Socks) && (hasProxyAppList || effectiveFakeIpEnabled)
+
 val AppState.effectiveFakeIpEnabled: Boolean
     get() = effectiveLocalDnsEnabled && dnsEnhancedMode == MihomoDnsModeFakeIp
 
+// The module answers the applications the list covers, in their own processes,
+// so the proxy leaves local DNS entirely alone.
+val AppState.dnsServedByModule: Boolean
+    get() = canScopeDnsToAppList && dnsHijackScope == DnsHijackScopeModule
+
+// A scope that keeps the applications outside the list working makes per
+// application mode safe again. The scope is the user's choice, so it is read
+// before the policy it enables: choosing it is what allows a list to exist.
+val AppState.dnsScopeProtectsExcludedApps: Boolean
+    get() = dnsServedByModule
+
 val AppState.requiresGlobalProxyAppMode: Boolean
-    get() = runMode.isRootRunMode() && effectiveFakeIpEnabled
+    get() = runMode.isRootRunMode() && effectiveFakeIpEnabled &&
+        !dnsScopeProtectsExcludedApps
 
 internal fun AppState.withCompatibleProxyAppListMode(): AppState =
     if (requiresGlobalProxyAppMode && proxyAppListMode != ProxyAppListModeGlobal) {
@@ -161,6 +196,23 @@ internal fun AppState.withCompatibleProxyAppListMode(): AppState =
     } else {
         this
     }
+
+// Interception covers every application unless the module takes the decision.
+val AppState.effectiveDnsHijackScope: Int
+    get() = if (dnsServedByModule) DnsHijackScopeModule else DnsHijackScopeAllApps
+
+// DNS interception covers every application, because the platform resolver
+// answers for all of them at once. The applications the list leaves out are
+// therefore kept working by the core itself: the daemon redirects their fake
+// addresses to a direct inbound of the core, which connects for them without the
+// proxy. Every mode whose policy the daemon enforces delivers them that way.
+// The relay also runs under the module scope: an answer an application received
+// before the list changed outlives that change, and the process that keeps the
+// address stops being marked at the same moment.
+val AppState.fakeIpRelayEnabled: Boolean
+    get() = (runMode == RunModeTproxy || runMode == RunModeTun2Socks ||
+        runMode == RunModeBpf2Socks) && dnsServedByModule &&
+        effectiveFakeIpEnabled
 
 fun AppState.withMihomoRestartRequired(
     profileId: Int,

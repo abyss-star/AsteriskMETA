@@ -3,6 +3,8 @@
 
 package engine.root.config
 
+import app.modes.DnsHijackScopeAllApps
+import app.modes.DnsHijackScopeModule
 import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
 import app.modes.ProxyAppListModeWhitelist
@@ -11,6 +13,7 @@ import engine.root.daemon.config.AsteriskdAppPolicyMode
 import engine.root.daemon.config.AsteriskdConfig
 import engine.root.daemon.config.AsteriskdCoreConfig
 import engine.root.daemon.config.AsteriskdCoreType
+import engine.root.daemon.config.AsteriskdDnsHijackScope
 import engine.root.daemon.config.AsteriskdHelper
 import engine.root.daemon.config.AsteriskdMatcher
 import engine.root.daemon.config.AsteriskdMetaConfigFactory
@@ -60,6 +63,7 @@ internal fun RootStartConfig.buildAsteriskdConfig(
                 enableLocalDns = false,
                 enableFakeDns = false,
                 fakeDnsIpv4Pool = null,
+                dnsHijackScope = AsteriskdDnsHijackScope.Global,
                 ignoredInterfaces = emptyList(),
                 virtualInterfaces = emptyList(),
                 // Shared interfaces are used only for Android offload preparation.
@@ -85,6 +89,10 @@ internal fun RootStartConfig.buildAsteriskdConfig(
                 enableLocalDns = enableLocalDns,
                 enableFakeDns = enableFakeIp,
                 fakeDnsIpv4Pool = fakeIpIpv4Pool.takeIf { enableFakeIp },
+                dnsHijackScope = when (dnsHijackScope) {
+                    DnsHijackScopeModule -> AsteriskdDnsHijackScope.Module
+                    else -> AsteriskdDnsHijackScope.Global
+                },
                 ignoredInterfaces = iptablesConfig.ignoredInterfaces.distinct(),
                 virtualInterfaces = virtualInterfaces.distinct(),
                 hotspotInterfacePrefixes = iptablesConfig.externalInterfacePrefixes.distinct(),

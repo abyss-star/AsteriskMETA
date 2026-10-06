@@ -22,6 +22,11 @@ import engine.root.publication.RootBootPublicationCommand
 import engine.root.publication.RootPublicationBundle
 import engine.root.publication.RootPublicationCommand
 import engine.root.publication.RootPublicationWriter
+import engine.mihomo.DefaultMihomoDnsFakeIpRange
+import engine.mihomo.MihomoModuleDnsListen
+import engine.root.daemon.config.AsteriskdAppPolicyMode
+import engine.root.daemon.config.AsteriskdDnsHijackScope
+import engine.root.publication.RootFakeIpModuleCommand
 import engine.root.publication.RootPublicationLaunchMode
 import engine.root.publication.RootServiceLogCleanupWarningPrefix
 import engine.root.publication.prepareRootPublicationDirectories
@@ -87,6 +92,10 @@ internal class RootSupervisorController(
             val disposition = snapshot.ordinaryStartDisposition(AsteriskdOwner.AsteriskMeta, config.mode)
             if (disposition == RootOrdinaryStartDisposition.Reuse) {
                 observeRunningFailure(snapshot, explicitRootAction = true)
+                // The running daemon keeps the rules it was launched with, so a scope
+                // change reaches the wire only after a restart. The module is read per
+                // application start instead, so it can already follow the new setting.
+                publishFakeIpModuleLink(config)
                 return snapshot
             }
             if (disposition.shutdownBeforeLaunch) shutdownOwn()
@@ -151,6 +160,47 @@ internal class RootSupervisorController(
         return plan.launchMode == RootPublicationLaunchMode.Service
     }
 
+    // The module configuration follows the daemon configuration it was compiled
+    // from, so the list the module answers for is the list the rules enforce. A
+    // failure here only costs the module its list, and the module fails open, so
+    // it never keeps the proxy from starting.
+    private suspend fun publishFakeIpModuleLink(config: AsteriskdConfig) {
+        val moduleEnabled = config.network.dnsHijackScope == AsteriskdDnsHijackScope.Module
+        val scope = when (config.network.appPolicy.mode) {
+            AsteriskdAppPolicyMode.Blacklist -> "deny"
+            else -> "allow"
+        }
+        val command = RootFakeIpModuleCommand.buildLink(
+            moduleEnabled = moduleEnabled,
+            endpoint = MihomoModuleDnsListen,
+            pool = config.network.fakeDnsIpv4Pool ?: DefaultMihomoDnsFakeIpRange,
+            scope = scope,
+            uids = config.network.appPolicy.uids,
+        )
+        runCatching {
+            val result = shell.exec(command, ShellExecOptions(logFailure = false))
+            if (result.errno != 0) {
+                AndroidAppLogger.warn(LogTag, "module_link_write failed errno=" + result.errno)
+            }
+        }
+    }
+
+    // The endpoint the module was handed is going away with the proxy. Leaving the
+    // list in place would cost every resolution a failed attempt at a dead port
+    // before the module falls back to the system resolver, so it is turned off.
+    private suspend fun retireFakeIpModuleLink() {
+        val command = RootFakeIpModuleCommand.buildLink(
+            moduleEnabled = false,
+            endpoint = MihomoModuleDnsListen,
+            pool = DefaultMihomoDnsFakeIpRange,
+            scope = "allow",
+            uids = emptyList(),
+        )
+        runCatching {
+            shell.exec(command, ShellExecOptions(logFailure = false))
+        }
+    }
+
     private suspend fun launch(
         root: RootStartConfig,
         config: AsteriskdConfig,
@@ -184,6 +234,8 @@ internal class RootSupervisorController(
             stage = "config_write"
             RootPublicationWriter.write(runtimeLayout, root.mihomoProfileBytes, daemonConfigBytes)
             runCatching { AndroidAppLogger.info(LogTag, "root_start stage=config_write result=ok") }
+            stage = "module_link_write"
+            publishFakeIpModuleLink(config)
             stage = "launch"
             val launchResult = mihomoCoreFetchLock.withLock {
                 shell.exec(
@@ -241,6 +293,7 @@ internal class RootSupervisorController(
         }
         if (response.result.code == AsteriskdResultCode.Ok || response.result.code == AsteriskdResultCode.NotRunning) {
             RootFailureWatcher.stop()
+            retireFakeIpModuleLink()
             return response
         }
         error(response.result.message ?: "Failed to stop asteriskd")

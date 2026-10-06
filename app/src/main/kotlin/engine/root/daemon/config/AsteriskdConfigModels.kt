@@ -41,6 +41,11 @@ internal enum class AsteriskdAppPolicyMode(val wireValue: String) {
     Whitelist("whitelist"),
 }
 
+internal enum class AsteriskdDnsHijackScope(val wireValue: String) {
+    Global("global"),
+    Module("module"),
+}
+
 internal data class AsteriskdConfig(
     val owner: AsteriskdOwner,
     val coreType: AsteriskdCoreType,
@@ -124,6 +129,7 @@ internal data class AsteriskdNetworkConfig(
     val enableLocalDns: Boolean,
     val enableFakeDns: Boolean,
     val fakeDnsIpv4Pool: String?,
+    val dnsHijackScope: AsteriskdDnsHijackScope,
     val ignoredInterfaces: List<String>,
     val virtualInterfaces: List<String>,
     val hotspotInterfacePrefixes: List<String>,
@@ -143,6 +149,7 @@ internal data class AsteriskdAppPolicy(
 internal data class AsteriskdModeOptions(
     val transparentPort: Int?,
     val tunnelName: String?,
+    val fakeIpRelayPort: Int?,
 )
 
 internal data class AsteriskdMatcher(

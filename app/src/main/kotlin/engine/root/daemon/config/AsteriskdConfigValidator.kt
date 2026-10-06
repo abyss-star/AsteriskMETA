@@ -14,6 +14,13 @@ internal object AsteriskdConfigValidator {
         AsteriskdMetaConfigFactory.requireRunnableMode(mode)
         require(!(network.enableIpv6 && network.disableSystemIpv6))
         require(network.enableFakeDns == (network.fakeDnsIpv4Pool != null))
+        // The module answers through the core, so the core has to keep its local
+        // DNS and hand out the addresses the module returns.
+        require(
+            network.dnsHijackScope != AsteriskdDnsHijackScope.Module ||
+                (network.enableLocalDns && network.enableFakeDns &&
+                    network.fakeDnsIpv4Pool != null),
+        )
         require(network.appPolicy.uids == network.appPolicy.uids.distinct().sorted())
         require(network.appPolicy.bypassUids == network.appPolicy.bypassUids.distinct().sorted())
         require((network.appPolicy.directCidrPathV4 == null) == (network.appPolicy.directCidrPathV6 == null))
