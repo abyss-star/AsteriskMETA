@@ -4,13 +4,17 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Fork 侧的构建走 workflow_dispatch，PR 走 pull_request。两者分开成组、并且手动触发之间
+# 不再互相取消：原来的 group 只用 pull_request.number，dispatch 时它是空的，于是所有手动
+# 构建挤在同一个组里——后一次触发会把前一次取消，表现出来就是"排队十几分钟然后 cancelled"。
 concurrency:
-  group: ci-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -102,5 +106,19 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/$ndk_version" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/$ndk_version" >> "$GITHUB_ENV"
 
-      - name: Assemble release APKs
-        run: ./gradlew --no-daemon :app:assembleRelease
+      - name: Assemble release and debug APKs
+        run: ./gradlew --no-daemon :app:assembleRelease :app:assembleDebug
+
+      - name: Upload unsigned release APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-release-unsigned
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Upload debug APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
