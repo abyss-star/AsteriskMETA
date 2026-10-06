@@ -107,10 +107,20 @@ internal fun AsteriskModalBottomSheet(
     LaunchedEffect(show) {
         if (show) {
             renderSheet = true
-            if (sheetState.isVisible) sheetState.show()
+            // Shown unconditionally: a dismissal that was cancelled leaves the
+            // sheet below its visible values, and a sheet that is still rendered
+            // while it is not visible keeps its window in front of the screen.
+            sheetState.show()
         } else if (renderSheet) {
-            sheetState.hide()
-            if (!sheetState.isVisible) renderSheet = false
+            // A cancelled dismissal must not leave that window behind either.
+            // The window is full screen, transparent and still takes input, so
+            // the screen behind it stops responding; disposing the sheet is what
+            // closes it, whether or not the animation ran to its end.
+            try {
+                sheetState.hide()
+            } finally {
+                renderSheet = false
+            }
         }
     }
 
