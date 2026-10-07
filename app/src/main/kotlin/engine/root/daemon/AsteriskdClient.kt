@@ -80,7 +80,11 @@ internal class AsteriskdClient(
                 runCatching { AndroidAppLogger.warn(LogTag, "root_watch exit=${result.errno} stderr=${result.stderr.take(512)}") }
             }
             stream.runningSnapshot?.let { return it }
-            if (stream.retryWhenUnbound) {
+            // The watcher is bounded on its own, so it also ends while the daemon is still applying
+            // its rules. A daemon that answered keeps that wait alive: the caller's bound decides how
+            // long a start may take, and it reconciles what the runtime became before it reports a
+            // failure. Only a watcher that never reached the daemon ends the wait here.
+            if (stream.retryWhenUnbound || stream.daemonAnswered) {
                 delay(retryDelayMilliseconds.milliseconds)
                 retryDelayMilliseconds = (retryDelayMilliseconds * 2L)
                     .coerceAtMost(MaxWatchRetryDelayMilliseconds)
@@ -180,6 +184,11 @@ internal class AsteriskdClient(
         var retryWhenUnbound: Boolean = false
             private set
 
+        /** True once the daemon answered this watch, whatever phase it reported. */
+        @Volatile
+        var daemonAnswered: Boolean = false
+            private set
+
         private var initialReceived = false
         private var lastSequence = 0L
 
@@ -195,6 +204,7 @@ internal class AsteriskdClient(
                 check(response.result.code == AsteriskdResultCode.Ok) {
                     response.result.message ?: "asteriskd watch request failed"
                 }
+                daemonAnswered = true
                 val snapshot = requireNotNull(response.result.snapshot)
                 if (snapshot.phase == AsteriskdPhase.Stopped) {
                     retryWhenUnbound = true

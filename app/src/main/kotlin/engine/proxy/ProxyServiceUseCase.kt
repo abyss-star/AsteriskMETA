@@ -61,8 +61,29 @@ internal class ProxyServiceUseCase(
             proxyEngine.start(ProxyEngineStartRequest(state))
         }.fold(
             onSuccess = { status -> ProxyServiceResult.Success(proxyRunning = status.running, appState = status.appState) },
-            onFailure = { error -> error.toProxyServiceFailure(RootRequestedAction.OrdinaryStart) },
+            onFailure = { error -> recoverStartFailure(state, error) },
         )
+    }
+
+    /**
+     * A start attempt can end before the daemon it launched reports the phase the attempt waits for.
+     * Reporting a failure then would leave the screen behind a service that is about to run, and the
+     * next tap would stop that service instead of starting it. What the runtime actually is decides
+     * the outcome of such an attempt.
+     */
+    private suspend fun recoverStartFailure(state: AppState, error: Throwable): ProxyServiceResult {
+        if (error is CancellationException) throw error
+        if (error !is RootRuntimeConflictException && error !is RootRuntimeBusyException) {
+            val live = runCatching { proxyEngine.status(state.runMode, state) }.getOrNull()
+            if (live != null && live.running) {
+                AndroidAppLogger.warn(
+                    LogTag,
+                    "root_result code=start_reconciled action=ordinary_start owner=asteriskmeta",
+                )
+                return ProxyServiceResult.Success(proxyRunning = true, appState = live.appState)
+            }
+        }
+        return error.toProxyServiceFailure(RootRequestedAction.OrdinaryStart)
     }
 
     suspend fun stop(runMode: Int): ProxyServiceResult {

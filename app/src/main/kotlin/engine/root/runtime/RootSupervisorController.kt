@@ -248,13 +248,7 @@ internal class RootSupervisorController(
             }
             stage = "await_ready"
             runCatching { AndroidAppLogger.info(LogTag, "root_start stage=launch result=sent") }
-            val snapshot = withTimeoutOrNull(StartTimeoutMilliseconds.milliseconds) {
-                when (launchMode) {
-                    RootPublicationLaunchMode.Service -> client.awaitRunning(runtimeLayout.asteriskdPath)
-                    RootPublicationLaunchMode.Monitor -> client.awaitStopped(runtimeLayout.asteriskdPath)
-                    RootPublicationLaunchMode.None -> error("A non-launch publication has no runtime snapshot")
-                }
-            } ?: throw IllegalStateException("asteriskd did not reach the requested phase before timeout")
+            val snapshot = awaitPhase(launchMode)
             if (snapshot.owner != AsteriskdOwner.AsteriskMeta) throw RootRuntimeConflictException(snapshot)
             require(snapshot.mode == config.mode) { "Unexpected ROOT mode ${snapshot.mode.wireValue}" }
             if (launchMode == RootPublicationLaunchMode.Service) {
@@ -271,6 +265,37 @@ internal class RootSupervisorController(
             runCatching { AndroidAppLogger.warn(LogTag, "root_start stage=$stage result=$outcome type=${error.javaClass.simpleName}") }
             throw error
         }
+    }
+
+    /**
+     * Waits for the phase this launch asked for. The daemon applies its whole rule set before it
+     * reports that phase, so a start that outlives the wait is not a failure by itself: the runtime
+     * is asked what it actually is before one is reported. A start that ends by telling the user it
+     * failed while the service runs is worse than a start that reports what it found, and the screen
+     * behind it can then never contradict the service.
+     */
+    private suspend fun awaitPhase(launchMode: RootPublicationLaunchMode): AsteriskdSnapshot {
+        val awaited = withTimeoutOrNull(StartTimeoutMilliseconds.milliseconds) {
+            when (launchMode) {
+                RootPublicationLaunchMode.Service -> client.awaitRunning(runtimeLayout.asteriskdPath)
+                RootPublicationLaunchMode.Monitor -> client.awaitStopped(runtimeLayout.asteriskdPath)
+                RootPublicationLaunchMode.None -> error("A non-launch publication has no runtime snapshot")
+            }
+        }
+        if (awaited != null) return awaited
+        val settled = runCatching { status().boundSnapshot() }.getOrNull()
+        val reached = when (launchMode) {
+            RootPublicationLaunchMode.Service -> settled?.phase == AsteriskdPhase.Running
+            RootPublicationLaunchMode.Monitor -> settled?.phase == AsteriskdPhase.Stopped
+            RootPublicationLaunchMode.None -> false
+        }
+        if (settled == null || !reached) {
+            throw IllegalStateException("asteriskd did not reach the requested phase before timeout")
+        }
+        runCatching {
+            AndroidAppLogger.warn(LogTag, "root_start stage=await_ready result=reconciled phase=" + settled.phase)
+        }
+        return settled
     }
 
     suspend fun stopOwn(): AsteriskdControlResponse {
@@ -417,4 +442,8 @@ internal fun sanitizeLauncherStderr(stderr: String): String {
     return retained.joinToString("\n").trim().ifBlank { stderrWithoutCleanupWarnings }
 }
 
-private const val StartTimeoutMilliseconds = 15_000L
+// The daemon applies its whole rule set before it reports the running phase, and a policy that names
+// applications adds rules per application and transport, so the wait grows with the application list
+// on the device. This bound only decides when a start the daemon never reports on is given up on; a
+// phase the daemon does report arrives long before it.
+private const val StartTimeoutMilliseconds = 60_000L
