@@ -7,6 +7,7 @@ import android.content.Context
 import app.AppState
 import app.effectiveFakeIpEnabled
 import app.effectiveLocalDnsEnabled
+import app.kpmDnsModuleActive
 import engine.mihomo.DefaultMihomoDnsFakeIpRange
 import engine.mihomo.MihomoProfileFactory
 import engine.mihomo.prepareMihomoCoreLogPaths
@@ -79,6 +80,7 @@ private fun AppState.toRootStartConfig(
         enableLocalDns = if (rawConfig == null) effectiveLocalDnsEnabled else rawDnsHijack,
         enableFakeIp = if (rawConfig == null) effectiveFakeIpEnabled else false,
         fakeIpIpv4Pool = rootFakeIpIpv4Pool(),
+        kpmDnsModuleActive = kpmDnsModuleActive,
         enableBoot = enableRootBootScript,
         serviceControl = serviceControl,
         manageProviders = selectedMihomoProfileOrNull()?.disableOverrides != true,

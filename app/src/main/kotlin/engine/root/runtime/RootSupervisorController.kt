@@ -10,6 +10,7 @@ import engine.root.config.RootStartConfig
 import engine.root.daemon.AsteriskdClient
 import engine.root.daemon.config.AsteriskdConfig
 import engine.root.daemon.config.AsteriskdConfigEncoder
+import engine.root.daemon.config.AsteriskdAppPolicyMode
 import engine.root.daemon.config.AsteriskdMode
 import engine.root.daemon.config.AsteriskdOwner
 import engine.root.daemon.control.AsteriskdControlCodec
@@ -19,6 +20,7 @@ import engine.root.daemon.control.AsteriskdResultCode
 import engine.root.daemon.control.AsteriskdSnapshot
 import engine.root.publication.RootBootConfigWriter
 import engine.root.publication.RootBootPublicationCommand
+import engine.root.publication.RootKpmDnsModuleCommand
 import engine.root.publication.RootPublicationBundle
 import engine.root.publication.RootPublicationCommand
 import engine.root.publication.RootPublicationWriter
@@ -87,6 +89,10 @@ internal class RootSupervisorController(
             val disposition = snapshot.ordinaryStartDisposition(AsteriskdOwner.AsteriskMeta, config.mode)
             if (disposition == RootOrdinaryStartDisposition.Reuse) {
                 observeRunningFailure(snapshot, explicitRootAction = true)
+                // A running daemon keeps the rules it was launched with, so a
+                // policy change reaches the wire only after a restart. The module
+                // is read per query instead, so it can already follow the setting.
+                publishKpmDnsModule(root, config)
                 return snapshot
             }
             if (disposition.shutdownBeforeLaunch) shutdownOwn()
@@ -184,6 +190,8 @@ internal class RootSupervisorController(
             stage = "config_write"
             RootPublicationWriter.write(runtimeLayout, root.mihomoProfileBytes, daemonConfigBytes)
             runCatching { AndroidAppLogger.info(LogTag, "root_start stage=config_write result=ok") }
+            stage = "kpm_dns_module_write"
+            publishKpmDnsModule(root, config)
             stage = "launch"
             val launchResult = mihomoCoreFetchLock.withLock {
                 shell.exec(
@@ -241,6 +249,7 @@ internal class RootSupervisorController(
         }
         if (response.result.code == AsteriskdResultCode.Ok || response.result.code == AsteriskdResultCode.NotRunning) {
             RootFailureWatcher.stop()
+            retireKpmDnsModule()
             return response
         }
         error(response.result.message ?: "Failed to stop asteriskd")
@@ -273,9 +282,49 @@ internal class RootSupervisorController(
             response.result.code == AsteriskdResultCode.NotRunning
         ) {
             RootFailureWatcher.stop()
+            retireKpmDnsModule()
             return response
         }
         error(response.result.message ?: "Failed to shutdown asteriskd")
+    }
+
+    // The KPM module decides inside the kernel which application asked for a
+    // query, and the rule it installs beside that decision lets the applications
+    // the proxy does not serve through the interception. It needs the list the
+    // daemon enforces for that, so both sides always agree on which applications
+    // the proxy serves.
+    //
+    // A failure here only costs the attribution. The module keeps out of the way
+    // and the proxy intercepts every application as it did before, so it never
+    // keeps the proxy from starting.
+    private suspend fun publishKpmDnsModule(root: RootStartConfig, config: AsteriskdConfig) {
+        // The module marks the applications the list leaves out, so a policy that
+        // serves every application has no list to work from: an empty one would
+        // mark every application and take the fake answers away from all of them.
+        val policy = config.network.appPolicy
+        val command = if (root.kpmDnsModuleActive && policy.mode != AsteriskdAppPolicyMode.Global) {
+            RootKpmDnsModuleCommand.buildApply(proxyUids = policy.uids)
+        } else {
+            RootKpmDnsModuleCommand.buildRetire()
+        }
+        runKpmDnsModuleCommand(command, "kpm_dns_module_write")
+    }
+
+    // The interception the marked queries were let through is going away with the
+    // proxy, and the module keeps its policy across restarts, so a configuration
+    // left enabled would have the next start install rules for a proxy that is
+    // not there.
+    private suspend fun retireKpmDnsModule() {
+        runKpmDnsModuleCommand(RootKpmDnsModuleCommand.buildRetire(), "kpm_dns_module_retire")
+    }
+
+    private suspend fun runKpmDnsModuleCommand(command: String, stage: String) {
+        runCatching {
+            val result = shell.exec(command, ShellExecOptions(logFailure = false))
+            if (result.errno != 0) {
+                AndroidAppLogger.warn(LogTag, stage + " failed errno=" + result.errno)
+            }
+        }
     }
 
     suspend fun publishBoot(
@@ -288,6 +337,9 @@ internal class RootSupervisorController(
             coreConfigBytes = root.mihomoProfileBytes,
             encodedDaemonConfig = AsteriskdConfigEncoder.encode(config),
         )
+        // The boot script starts the daemon without the application, so the half
+        // the module reads has to be on the device before that happens.
+        publishKpmDnsModule(root, config)
         val result = shell.exec(
             RootBootPublicationCommand.buildInstallation(runtimeLayout),
             ShellExecOptions(logFailure = false),

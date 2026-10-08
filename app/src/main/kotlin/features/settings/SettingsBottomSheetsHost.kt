@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import app.AppState
 import app.LocalAppServices
 import app.R
+import app.kpmDnsModuleAvailable
 import features.settings.sheets.DnsSettingsBottomSheet
 import features.settings.sheets.ExternalInterfacesBottomSheet
 import features.settings.sheets.IgnoredInterfacesBottomSheet
@@ -179,6 +180,7 @@ internal fun SettingsBottomSheetsHost(
         draft = sheetState.dnsSettingsDraft,
         onDraftChange = { sheetState.dnsSettingsDraft = it },
         onDismissRequest = { sheetState.showDnsSettings = false },
+        kpmDnsModuleAvailable = appState.kpmDnsModuleAvailable,
         onSave = { draft ->
             updateAppState { state ->
                 state.copy(
@@ -202,6 +204,7 @@ internal fun SettingsBottomSheetsHost(
                     dnsFallbackFilterIpcidr = draft.dnsFallbackFilterIpcidr,
                     dnsFallbackFilterDomain = draft.dnsFallbackFilterDomain,
                     dnsHosts = draft.dnsHosts,
+                    enableKpmDnsModule = draft.enableKpmDnsModule,
                 )
             }
             sheetState.showDnsSettings = false

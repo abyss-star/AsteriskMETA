@@ -62,6 +62,7 @@ internal fun DnsSettingsBottomSheet(
     onDraftChange: (DnsSettingsDraft) -> Unit,
     onDismissRequest: () -> Unit,
     onSave: (DnsSettingsDraft) -> Unit,
+    kpmDnsModuleAvailable: Boolean,
 ) {
     val dnsServerInvalidMessage = stringResource(R.string.settings_dns_server_invalid)
     val dnsDomainInvalidMessage = stringResource(R.string.settings_dns_domain_invalid)
@@ -136,6 +137,24 @@ internal fun DnsSettingsBottomSheet(
                         selectedIndex = draft.dnsEnhancedMode.coerceIn(MihomoDnsModeValues.indices),
                         onSelectedIndexChange = { onDraftChange(draft.copy(dnsEnhancedMode = it)) },
                     )
+                    // Offered where the module has a decision to make: the proxy
+                    // has to serve some applications and not others, and the
+                    // answers it hands out have to be fake ones. The mode is read
+                    // from the draft so the switch follows the choice being made
+                    // in this sheet rather than the one already saved.
+                    AnimatedVisibility(
+                        visible = kpmDnsModuleAvailable && draft.dnsEnhancedMode == MihomoDnsModeFakeIp,
+                        enter = AsteriskMotion.contentEnter(),
+                        exit = AsteriskMotion.contentExit(),
+                    ) {
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_dns_kpm_module),
+                            icon = Icons.Rounded.Dns,
+                            summary = stringResource(R.string.settings_dns_kpm_module_summary),
+                            checked = draft.enableKpmDnsModule,
+                            onCheckedChange = { onDraftChange(draft.copy(enableKpmDnsModule = it)) },
+                        )
+                    }
                     SwitchPreference(
                         title = stringResource(R.string.settings_dns_respect_rules),
                         icon = Icons.Rounded.Policy,

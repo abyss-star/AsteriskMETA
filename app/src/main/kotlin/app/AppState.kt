@@ -10,7 +10,9 @@ import app.modes.MihomoProxyLayoutAuto
 import app.modes.MihomoProxySortDefault
 import app.modes.MihomoTunStackMips
 import engine.mihomo.DefaultMihomoTunCongestionController
+import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
+import app.modes.ProxyAppListModeWhitelist
 import app.modes.RunModeVpnService
 import app.modes.isRootRunMode
 import engine.root.RootModeEngine
@@ -122,6 +124,7 @@ data class AppState(
     val dnsFallbackFilterIpcidr: List<String> = DefaultMihomoDnsFallbackFilterIpcidr,
     val dnsFallbackFilterDomain: List<String> = DefaultMihomoDnsFallbackFilterDomain,
     val dnsHosts: List<String> = emptyList(),
+    val enableKpmDnsModule: Boolean = false,
 
     val transparentProxyPort: String = RootModeEngine.DefaultTproxyPort.toString(),
     val enableRootBootScript: Boolean = false,
@@ -152,8 +155,31 @@ val AppState.rootIpv6DataPathEnabled: Boolean
 val AppState.effectiveFakeIpEnabled: Boolean
     get() = effectiveLocalDnsEnabled && dnsEnhancedMode == MihomoDnsModeFakeIp
 
+val AppState.hasProxyAppList: Boolean
+    get() = proxyAppListMode == ProxyAppListModeBlacklist ||
+        proxyAppListMode == ProxyAppListModeWhitelist
+
+// The KPM module decides the DNS attribution inside the kernel, and the rule it
+// installs beside it only has something to let through where the proxy serves
+// some applications and not others. It is also offered while fake answers hold
+// the selection at the global mode: turning the module on is what makes a list
+// safe again, so hiding the switch there would lock the list away for good.
+val AppState.kpmDnsModuleAvailable: Boolean
+    get() = runMode.isRootRunMode() && (hasProxyAppList || effectiveFakeIpEnabled)
+
+// The module only decides anything while the platform resolver is handing out
+// fake answers and the proxy is there to intercept them.
+val AppState.kpmDnsModuleActive: Boolean
+    get() = kpmDnsModuleAvailable && effectiveFakeIpEnabled && enableKpmDnsModule
+
+// The module takes the applications the proxy does not serve out of the
+// interception, so a list no longer leaves them without a working resolver.
+val AppState.kpmDnsModuleProtectsExcludedApps: Boolean
+    get() = kpmDnsModuleActive
+
 val AppState.requiresGlobalProxyAppMode: Boolean
-    get() = runMode.isRootRunMode() && effectiveFakeIpEnabled
+    get() = runMode.isRootRunMode() && effectiveFakeIpEnabled &&
+        !kpmDnsModuleProtectsExcludedApps
 
 internal fun AppState.withCompatibleProxyAppListMode(): AppState =
     if (requiresGlobalProxyAppMode && proxyAppListMode != ProxyAppListModeGlobal) {

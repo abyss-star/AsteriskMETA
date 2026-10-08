@@ -82,6 +82,7 @@ internal data class DnsSettingsDraft(
     val dnsFallbackFilterIpcidr: List<String> = emptyList(),
     val dnsFallbackFilterDomain: List<String> = emptyList(),
     val dnsHosts: List<String> = emptyList(),
+    val enableKpmDnsModule: Boolean = false,
 )
 
 internal fun AppState.toDnsSettingsDraft(): DnsSettingsDraft {
@@ -106,6 +107,7 @@ internal fun AppState.toDnsSettingsDraft(): DnsSettingsDraft {
         dnsFallbackFilterIpcidr = dnsFallbackFilterIpcidr,
         dnsFallbackFilterDomain = dnsFallbackFilterDomain,
         dnsHosts = dnsHosts,
+        enableKpmDnsModule = enableKpmDnsModule,
     )
 }
 

@@ -492,6 +492,8 @@
     <string name="settings_dns_hosts_empty">No DNS hosts added</string>
     <string name="settings_dns_hosts_format">Format: domain:address1,address2,…</string>
     <string name="settings_dns_hosts_invalid">Invalid DNS hosts entry</string>
+    <string name="settings_dns_kpm_module">Attribute DNS through the KPM module</string>
+    <string name="settings_dns_kpm_module_summary">The fakeip_dns module in the kernel marks the queries the applications outside the proxy send, so the proxy-wide DNS interception lets them through to the system resolver, while the applications the proxy serves keep receiving fake addresses. Needs a kernel built with KPM and the fakeip_dns module loaded; restart the proxy afterwards.</string>
     <string name="settings_dns_list_empty">No entries added</string>
     <string name="settings_dns_nameserver">Nameserver</string>
     <string name="settings_dns_nameserver_policy">Nameserver policy</string>

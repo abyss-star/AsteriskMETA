@@ -481,6 +481,8 @@
     <string name="settings_dns_hosts_empty">还没有添加 DNS hosts</string>
     <string name="settings_dns_hosts_format">格式：域名:地址1,地址2,…</string>
     <string name="settings_dns_hosts_invalid">无效 DNS hosts 条目</string>
+    <string name="settings_dns_kpm_module">由 KPM 模块区分 DNS 归属</string>
+    <string name="settings_dns_kpm_module_summary">内核里的 fakeip_dns 模块把不走代理的应用发出的查询标出来，代理的全局 DNS 劫持会放过它们，它们继续使用系统 DNS；走代理的应用照常拿到假地址。需要内核开启 KPM 并已加载 fakeip_dns 模块；改动后须重启代理。</string>
     <string name="settings_dns_list_empty">还没有添加条目</string>
     <string name="settings_dns_nameserver">域名服务器</string>
     <string name="settings_dns_nameserver_policy">Nameserver Policy</string>
