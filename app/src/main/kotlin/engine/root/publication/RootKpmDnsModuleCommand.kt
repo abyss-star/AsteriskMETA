@@ -12,9 +12,11 @@ import utils.shellQuote
 // that asked for it when the module sees it.
 //
 // This command hands the module the half of the decision only the application side
-// knows: which applications the proxy serves. The module marks the queries of every
-// other application, and the rule the module installs beside it lets them through
-// the proxy's interception untouched, so they keep using the system resolver.
+// knows: the application list the proxy is enforcing. The module marks the queries of
+// the applications that half leaves out -- or the ones it names, when the list is the
+// blacklist and the half is the applications the proxy does not serve -- and the rule
+// the module installs beside it lets them through the proxy's interception untouched,
+// so they keep using the system resolver.
 //
 // The file is KPM specific on purpose. It carries only what this route reads, and
 // it is written and read independently of every other route's configuration.
@@ -39,7 +41,7 @@ internal object RootKpmDnsModuleCommand {
     // rather than reimplemented here so the module protocol stays in one place.
     // A device without the helper keeps working: nothing is installed, the proxy
     // intercepts every application as it did before, and the log says why.
-    fun buildApply(proxyUids: List<Int>, mark: String = DefaultMark): String = buildString {
+    fun buildApply(scope: KpmDnsListScope, uids: List<Int>, mark: String = DefaultMark): String = buildString {
         appendLine("set -eu")
         // The helper is the whole test of whether a device can do this: the module's
         // flashable package is what puts it there, and it is what owns the kernel
@@ -48,7 +50,7 @@ internal object RootKpmDnsModuleCommand {
         // which shares the name but not the mechanism, so a device carrying only that
         // one would look ready and then do nothing.
         appendLine(ensureHelper())
-        appendLine(writeConfig(enabled = true, mark = mark, proxyUids = proxyUids))
+        appendLine(writeConfig(enabled = true, mark = mark, scope = scope, uids = uids))
         appendLine("sh " + HelperPath.shellQuote() + " apply >/dev/null 2>&1 || true")
     }.trimEnd()
 
@@ -59,7 +61,7 @@ internal object RootKpmDnsModuleCommand {
     fun buildRetire(): String = buildString {
         appendLine("set -eu")
         appendLine(ensureHelper())
-        appendLine(writeConfig(enabled = false, mark = DefaultMark, proxyUids = emptyList()))
+        appendLine(writeConfig(enabled = false, mark = DefaultMark, scope = ScopeOfRetiredConfig, uids = emptyList()))
         appendLine("sh " + HelperPath.shellQuote() + " off >/dev/null 2>&1 || true")
     }.trimEnd()
 
@@ -71,21 +73,31 @@ internal object RootKpmDnsModuleCommand {
         append("; exit 0; }")
     }
 
-    private fun writeConfig(enabled: Boolean, mark: String, proxyUids: List<Int>): String = buildString {
+    private fun writeConfig(
+        enabled: Boolean,
+        mark: String,
+        scope: KpmDnsListScope,
+        uids: List<Int>,
+    ): String = buildString {
         appendLine("mkdir -p " + ConfigDirectory.shellQuote())
         appendLine("temporary=" + ConfigPath.shellQuote() + ".tmp.\$\$")
         appendLine(
-            "printf '%s' " + encode(enabled, mark, proxyUids).shellQuote() +
+            "printf '%s' " + encode(enabled, mark, scope, uids).shellQuote() +
                 " > \"\$temporary\""
         )
         appendLine("mv -f \"\$temporary\" " + ConfigPath.shellQuote())
         appendLine("chmod 0644 " + ConfigPath.shellQuote())
     }
 
-    // The proxy serves the applications on its list, so the module has to mark
-    // every other one: the list this file carries is the half of the decision the
-    // proxy made, and the module takes the complement of it.
-    private fun encode(enabled: Boolean, mark: String, proxyUids: List<Int>): String = buildString {
+    // The file carries both the list and the half it is, because the two policies
+    // name opposite halves and the module cannot tell them apart on its own: a list
+    // read the wrong way round marks exactly the applications it should leave alone.
+    private fun encode(
+        enabled: Boolean,
+        mark: String,
+        scope: KpmDnsListScope,
+        uids: List<Int>,
+    ): String = buildString {
         appendLine("{")
         appendLine("  \"version\": 1,")
         appendLine("  \"generated_at\": \"" + java.time.Instant.now() + "\",")
@@ -93,15 +105,39 @@ internal object RootKpmDnsModuleCommand {
         appendLine("  \"enabled\": " + enabled + ",")
         appendLine("  \"mark\": \"" + mark + "\",")
         appendLine("  \"ports\": [" + Ports.joinToString(", ") + "],")
-        appendLine("  \"scope\": \"deny\",")
+        appendLine("  \"scope\": \"" + scope.wireValue + "\",")
         appendLine("  \"apps\": [")
-        val sorted = proxyUids.distinct().sorted()
+        val sorted = uids.distinct().sorted()
         sorted.forEachIndexed { index, uid ->
             val suffix = if (index == sorted.size - 1) "" else ","
             appendLine("    { \"uid\": " + uid + " }" + suffix)
         }
         appendLine("  ],")
-        appendLine("  \"notes\": \"written by AsteriskMETA; the module marks every uid outside apps\"")
+        appendLine("  \"notes\": \"written by AsteriskMETA; scope names the half apps is\"")
         append("}")
     }
 }
+
+// The module reads two things: a list, and which half of the applications that list
+// is. The daemon's two policies name opposite halves, so the scope has to follow the
+// policy -- this is the only place where the direction is decided:
+//
+//   a whitelist names the applications the proxy serves, and the module marks the
+//   ones outside it (deny);
+//   a blacklist names the applications the proxy leaves alone, and the module marks
+//   exactly those (allow).
+//
+// The module implements both (g_scope_deny in kpm/src/fakeip_dns.c). Hard-coding
+// deny here turned a blacklist inside out: the applications the proxy served were
+// taken out of the interception and lost their fake answers, while the ones it left
+// alone were intercepted instead. The more accurate the list, the more inverted the
+// result. Measured on the device -- see kpm/docs/04.
+internal enum class KpmDnsListScope(val wireValue: String) {
+    MarksAppsOutsideList("deny"),
+    MarksAppsInsideList("allow"),
+}
+
+// A retired configuration carries no list, so the scope here is a placeholder: the
+// helper reads enabled=0, removes the rules, clears the list and switches the module
+// off, whichever half the list would have been.
+private val ScopeOfRetiredConfig = KpmDnsListScope.MarksAppsOutsideList

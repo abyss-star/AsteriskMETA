@@ -20,6 +20,7 @@ import engine.root.daemon.control.AsteriskdResultCode
 import engine.root.daemon.control.AsteriskdSnapshot
 import engine.root.publication.RootBootConfigWriter
 import engine.root.publication.RootBootPublicationCommand
+import engine.root.publication.KpmDnsListScope
 import engine.root.publication.RootKpmDnsModuleCommand
 import engine.root.publication.RootPublicationBundle
 import engine.root.publication.RootPublicationCommand
@@ -298,16 +299,27 @@ internal class RootSupervisorController(
     // and the proxy intercepts every application as it did before, so it never
     // keeps the proxy from starting.
     private suspend fun publishKpmDnsModule(root: RootStartConfig, config: AsteriskdConfig) {
-        // The module marks the applications the list leaves out, so a policy that
-        // serves every application has no list to work from: an empty one would
-        // mark every application and take the fake answers away from all of them.
+        // A policy that serves every application has no list to work from: an empty
+        // one would mark every application and take the fake answers away from all
+        // of them, and a policy with no list has nothing to attribute either way.
         val policy = config.network.appPolicy
-        val command = if (root.kpmDnsModuleActive && policy.mode != AsteriskdAppPolicyMode.Global) {
-            RootKpmDnsModuleCommand.buildApply(proxyUids = policy.uids)
+        val scope = policy.mode.toKpmDnsListScope()
+        val command = if (root.kpmDnsModuleActive && scope != null) {
+            RootKpmDnsModuleCommand.buildApply(scope = scope, uids = policy.uids)
         } else {
             RootKpmDnsModuleCommand.buildRetire()
         }
         runKpmDnsModuleCommand(command, "kpm_dns_module_write")
+    }
+
+    // A whitelist names the applications the proxy serves and a blacklist names the
+    // ones it leaves alone, so the half the module has to mark is the complement of
+    // the list in the first case and the list itself in the second. Reading a
+    // blacklist as a whitelist marks exactly the wrong applications.
+    private fun AsteriskdAppPolicyMode.toKpmDnsListScope(): KpmDnsListScope? = when (this) {
+        AsteriskdAppPolicyMode.Whitelist -> KpmDnsListScope.MarksAppsOutsideList
+        AsteriskdAppPolicyMode.Blacklist -> KpmDnsListScope.MarksAppsInsideList
+        AsteriskdAppPolicyMode.Global -> null
     }
 
     // The interception the marked queries were let through is going away with the
@@ -416,4 +428,12 @@ internal fun sanitizeLauncherStderr(stderr: String): String {
     return retained.joinToString("\n").trim().ifBlank { stderrWithoutCleanupWarnings }
 }
 
-private const val StartTimeoutMilliseconds = 15_000L
+// A TPROXY or TUN2SOCKS start installs one matching rule per application on the
+// list, so a list of a hundred entries costs ten seconds and more before the
+// daemon reports itself ready; a global policy, which has no list at all, is
+// ready in about four. The budget has to cover the slow half, because giving up
+// early does not stop the daemon: it reports a failure to the user and leaves
+// the proxy running. Measured on the onyx device, launch to ready:
+// global 3.9 s, whitelist with 139 uids 11.7 s, blacklist with 139 uids 6.6 s,
+// TUN2SOCKS with 139 uids 14.4 s, and one TPROXY start over 15 s.
+private const val StartTimeoutMilliseconds = 45_000L
