@@ -19,7 +19,6 @@ import utils.shellQuote
 // The file is KPM specific on purpose. It carries only what this route reads, and
 // it is written and read independently of every other route's configuration.
 internal object RootKpmDnsModuleCommand {
-    internal const val ModuleDirectory = "/data/adb/modules/fakeip"
     internal const val ConfigDirectory = "/data/adb/fakeip"
     internal const val ConfigPath = ConfigDirectory + "/kpm.conf"
     internal const val HelperPath = ConfigDirectory + "/fakeip-kpm.sh"
@@ -42,7 +41,12 @@ internal object RootKpmDnsModuleCommand {
     // intercepts every application as it did before, and the log says why.
     fun buildApply(proxyUids: List<Int>, mark: String = DefaultMark): String = buildString {
         appendLine("set -eu")
-        appendLine("[ -d " + ModuleDirectory.shellQuote() + " ] || exit 0")
+        // The helper is the whole test of whether a device can do this: the module's
+        // flashable package is what puts it there, and it is what owns the kernel
+        // protocol. Testing for a module directory instead would answer a different
+        // question -- /data/adb/modules/fakeip belongs to the Zygisk route's module,
+        // which shares the name but not the mechanism, so a device carrying only that
+        // one would look ready and then do nothing.
         appendLine(ensureHelper())
         appendLine(writeConfig(enabled = true, mark = mark, proxyUids = proxyUids))
         appendLine("sh " + HelperPath.shellQuote() + " apply >/dev/null 2>&1 || true")
